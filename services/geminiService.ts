@@ -3,170 +3,172 @@ import { GoogleGenAI, Chat, GenerateContentResponse, Part, Type } from "@google/
 import { Business, ChatMessage, ChatSession } from '../types';
 import { logUsage } from "./firebaseService";
 
-// Fix: Initialize GoogleGenAI with process.env.API_KEY as per the coding guidelines.
-// The API key's availability is assumed to be handled by the execution environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize ai lazily to prevent crashing the app on import if the key is missing.
+// The UI component will handle showing a user-friendly error.
+let ai: GoogleGenAI | null = null;
+const getAiClient = () => {
+    if (!ai) {
+        const apiKey = import.meta.env.VITE_API_KEY;
+        if (!apiKey) {
+            // This error is a safeguard but should ideally not be reached
+            // as the UI will check for the key first.
+            throw new Error("VITE_API_KEY is not set. Cannot initialize GoogleGenAI.");
+        }
+        ai = new GoogleGenAI({ apiKey });
+    }
+    return ai;
+};
 
-// Helper to estimate token count
-const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
+/**
+ * Creates a new chat session with a system instruction tailored to the business.
+ * @param business - The business object containing details for the system prompt.
+ * @returns A Chat instance.
+ */
 export const createChatSession = (business: Business): Chat => {
+  const aiClient = getAiClient();
+  const systemInstruction = `You are ${business.characterName}, a friendly and professional AI assistant for ${business.businessName}, a ${business.businessCategory} located in ${business.city}. 
+  Your goal is to assist customers, answer their questions, and generate leads.
+  Business Information: ${business.businessInfo}.
+  
+  Key Instructions:
+  1.  Always be polite, helpful, and maintain the persona of ${business.characterName}.
+  2.  Use the provided business information to answer questions accurately.
+  3.  If a user asks for contact information, provide the WhatsApp number: ${business.businessWaNumber}. You can provide it as a link: https://wa.me/${business.businessWaNumber}.
+  4.  If a user asks about the website or location, provide these links if available: Website: ${business.websiteUrl || 'Not available'}, Google Business: ${business.googleBusinessUrl || 'Not available'}.
+  5.  Encourage users to check out the product/service catalogue. If you mention products or services, you can trigger a special 'offer' keyword in your response which will show the user a list of available items.
+  6.  Keep responses concise and easy to read. Use markdown for formatting like bolding key terms.
+  7.  Do not make up information. If you don't know an answer, politely state that you don't have that information and suggest contacting the business directly via WhatsApp.
+  8.  Do not reveal that you are a language model or AI. You are ${business.characterName}.
+  9.  The currency for all pricing is ${business.currency}.
+  10. When asked to perform an action you cannot do (e.g., book an appointment directly, process payments), guide the user to contact the business on WhatsApp to complete the action.`;
 
-  let productInfo = "This business does not have a product catalogue listed.";
-  if (business.products && business.products.length > 0) {
-    productInfo = `Here is the product catalogue. You can answer questions based on this. \n\n${business.products.map(p => {
-      const offerString = p.offer ? ` Offer Price: ${p.offer.newPrice} (expires ${p.offer.expiry})` : '';
-      return `- Product Name: ${p.name}\n  Type: ${p.type}\n  Description: ${p.description}\n  Price: ${p.price}${offerString}\n  Stock: ${p.type === 'product' ? p.stock : 'N/A'}`;
-    }).join('\n\n')}`;
-  }
-
-  const systemInstruction = `You are ${business.characterName}, a warm, empathetic, and professional AI assistant for ${business.businessName}. Your primary role is to assist potential clients by providing helpful information and guiding them to connect with the business.
-
-**Your Personality & Tone:**
-- **Human-like & Concise:** Be friendly, approachable, and use a conversational tone. Keep your answers short, meaningful, and to the point. Avoid long paragraphs. If you need to convey a lot of information, break it into smaller, easy-to-digest messages.
-- **Maintain Context:** Pay close attention to the flow of the conversation. Refer back to previous questions if it makes the chat feel more natural and continuous.
-- **Empathetic & Professional:** Be empathetic to the user's needs (e.g., "I understand you're looking for information on colds..."). Be professional and clear in your explanations.
-- **Vary Greetings:** Vary your initial greeting. Instead of always saying "Hello", try things like "Hi there!", "Welcome! How can I help?", or start directly with "I'm ${business.characterName}, the AI assistant for ${business.businessName}. What can I do for you today?".
-
-**Your Core Task:**
-1.  Carefully analyze the user's query.
-2.  Answer the query using **only** the information provided in the "Business Information" and "Product Catalogue" sections below.
-3.  **Do not invent any details, prices, or services.** This is extremely important.
-4.  **Crucially, do not provide medical, legal, or financial advice.** If the query asks for advice (e.g., "What should I do for a cold?"), your response must explain what services ${business.businessName} offers for that condition based on your information, and then strongly recommend contacting the professional directly for a proper consultation.
-5.  Seamlessly integrate a call to action in your response. Instead of just saying "contact them", try to phrase it naturally, like "For a personal consultation about your symptoms, the best step is to connect with Dr. Udbhavi directly."
-6.  If a user asks about products or services, use the provided catalogue. Note the 'type' field to distinguish between a 'product' with stock and a 'service'. If they ask to buy something or inquire, guide them to use the "View Catalogue" button or connect via WhatsApp. Mention any special offers if they exist.
-7.  If you absolutely cannot find any relevant information in your knowledge base to answer the user's question, politely state that you don't have the specific details and provide the business's contact information as the best source for an accurate answer.
-
-**Business Information:**
----
-${business.businessInfo}
----
-
-**Product Catalogue:**
----
-${productInfo}
----
-`;
-
-  return ai.chats.create({
+  const chat = aiClient.chats.create({
     model: 'gemini-2.5-flash',
     config: {
-      systemInstruction,
-    },
+      systemInstruction: systemInstruction,
+    }
   });
+  return chat;
 };
 
+/**
+ * Sends a message to the chat session and gets a response.
+ * @param chat - The active Chat instance.
+ * @param parts - The message parts (text and/or images) to send.
+ * @param businessId - The ID of the business for usage logging.
+ * @returns The AI's text response.
+ */
 export const getChatResponse = async (chat: Chat, parts: Part[], businessId: string): Promise<string> => {
   try {
-    const promptText = parts.find(p => p.text)?.text || '';
-    const promptTokens = estimateTokens(promptText);
-
-    // Fix: The `sendMessage` method expects a `SendMessageParameters` object, which has a `message` property.
-    const result: GenerateContentResponse = await chat.sendMessage({ message: parts });
-    const responseText = result.text ?? '';
+    getAiClient(); // Ensures client is initialized
+    const response: GenerateContentResponse = await chat.sendMessage({ message: parts });
+    // Rough token calculation for internal usage metrics (1 token ~ 4 chars)
+    const promptTokens = parts.reduce((acc, part) => acc + (part.text?.length || 0), 0) / 4;
+    const responseTokens = (response.text?.length || 0) / 4;
+    await logUsage(businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
     
-    const responseTokens = estimateTokens(responseText);
-    await logUsage(businessId, { geminiTokens: promptTokens + responseTokens });
-
-    return responseText;
+    return response.text ?? "I'm sorry, I'm having trouble responding right now. Please try again in a moment.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "I'm sorry, I'm having a bit of trouble connecting right now. Please try again in a moment.";
+    console.error("Error getting chat response from Gemini:", error);
+    await logUsage(businessId, { geminiTokens: 100 }); // Log a fixed amount on error
+    return "I'm sorry, an error occurred while connecting to the AI service. Please try again later.";
   }
 };
 
-
+/**
+ * Generates an AI-powered summary of recent chat sessions.
+ * @param sessions - An array of ChatSession objects.
+ * @param businessId - The ID of the business for usage logging.
+ * @returns A markdown-formatted summary string.
+ */
 export const generateChatSummary = async (sessions: ChatSession[], businessId: string): Promise<string> => {
-  if (sessions.length === 0) {
-    return "No chat data available to generate a summary.";
-  }
+    if (sessions.length === 0) {
+        return "No chat sessions found to analyze for the summary.";
+    }
+    const aiClient = getAiClient();
+    const chatLogs = sessions.slice(0, 10).map(session => {
+        const messages = session.messages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
+        return `--- Session Start ---\n${messages}\n--- Session End ---`;
+    }).join('\n\n');
 
-  const recentSessions = sessions.slice(0, 10);
-  
-  const conversationHistory = recentSessions.map(session => 
-    `Session ID: ${session.id}\n` +
-    session.messages.map(msg => `${msg.sender}: ${msg.text}`).join('\n')
-  ).join('\n\n---\n\n');
+    const prompt = `As a business intelligence analyst, review the following chat session logs for a business. Provide a concise summary with actionable insights. The summary should be in Markdown format.
 
-  const prompt = `
-    As a business intelligence analyst, review the following chat session transcripts between an AI assistant and potential customers for a business. Provide a concise summary that will help the business owner understand customer interactions.
+    **Chat Logs:**
+    ${chatLogs}
 
-    **Chat Transcripts:**
-    ${conversationHistory}
+    **Analysis Required:**
+    1.  **Overall Summary:** Briefly describe the general nature of the customer interactions.
+    2.  **Key Topics:** Identify the top 3-5 most frequently discussed topics or questions (e.g., pricing, services, location, hours).
+    3.  **Actionable Insights:** Suggest 2-3 concrete actions the business owner could take based on these conversations.
+    4.  **Sentiment Analysis:** Briefly mention the overall customer sentiment (e.g., generally positive, neutral with specific concerns).
 
-    **Analysis Task:**
-    Based on the transcripts, generate a summary in Markdown format. The summary should include:
-    1.  **Top 3 Most Common Topics:** What are the most frequent subjects customers are asking about? (e.g., specific services, pricing, business hours).
-    2.  **Key Customer Interests:** Were there any specific products or services that generated significant interest?
-    3.  **Actionable Insight:** Provide one concrete suggestion for the business owner based on these conversations. For example, "Consider creating a dedicated FAQ page for pricing, as it's a very common question."
-  `;
-  
-  try {
-      const promptTokens = estimateTokens(prompt);
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
-      const responseText = response.text ?? '';
-      const responseTokens = estimateTokens(responseText);
-      await logUsage(businessId, { geminiTokens: promptTokens + responseTokens });
-      return responseText;
-  } catch(e) {
-      console.error(e);
-      return "Could not generate summary due to an error."
-  }
-};
-
-export const getAgentSuggestions = async (messages: ChatMessage[], businessId: string): Promise<string[]> => {
-    if (messages.length === 0) return [];
-    
-    const recentHistory = messages.slice(-4).map(m => `${m.sender}: ${m.text}`).join('\n');
-    const lastUserMessage = messages.filter(m => m.sender === 'user').pop()?.text;
-    
-    if (!lastUserMessage) return [];
-
-    const prompt = `
-        You are an AI assistant for a customer support agent. Based on the recent conversation history and specifically the last user message, generate 3 concise, helpful, and professional replies that the agent can use.
-
-        **Conversation History:**
-        ${recentHistory}
-
-        **Last User Message:**
-        "${lastUserMessage}"
-
-        **Task:**
-        Provide 3 short, distinct reply suggestions for the agent.
-    `;
+    Provide a professional, data-driven summary.`;
 
     try {
-        const promptTokens = estimateTokens(prompt);
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+        const response = await aiClient.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+
+        const promptTokens = prompt.length / 4;
+        const responseTokens = (response.text?.length || 0) / 4;
+        await logUsage(businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
+        
+        return response.text ?? "Could not generate a summary at this time.";
+    } catch (error) {
+        console.error("Error generating chat summary:", error);
+        await logUsage(businessId, { geminiTokens: 200 });
+        return "An error occurred while generating the summary.";
+    }
+};
+
+/**
+ * Generates quick reply suggestions for a human agent.
+ * @param messages - The recent messages in the conversation.
+ * @param businessId - The ID of the business for usage logging.
+ * @returns An array of string suggestions.
+ */
+export const getAgentSuggestions = async (messages: ChatMessage[], businessId: string): Promise<string[]> => {
+    const lastUserMessage = messages.filter(m => m.sender === 'user').pop();
+    if (!lastUserMessage) {
+        return [];
+    }
+    const aiClient = getAiClient();
+    const conversationHistory = messages.slice(-5).map(m => `${m.sender}: ${m.text}`).join('\n');
+
+    const prompt = `You are an assistant for a human customer support agent. Based on the recent conversation history, and specifically the last user message, provide three concise, helpful, and professional quick reply suggestions for the agent.
+
+    **Recent Conversation:**
+    ${conversationHistory}
+
+    **Task:**
+    Return a JSON array of three distinct string suggestions. For example: ["Yes, I can help with that.", "Let me check on that for you.", "Could you provide more details?"]`;
+
+    try {
+        const response = await aiClient.models.generateContent({
+            model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        suggestions: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.STRING,
-                            },
-                        },
-                    },
-                },
-            },
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.STRING
+                    }
+                }
+            }
         });
+        const promptTokens = prompt.length / 4;
+        const responseTokens = (response.text?.length || 0) / 4;
+        await logUsage(businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
         
-        const jsonStr = (response.text ?? '').trim();
-        const responseTokens = estimateTokens(jsonStr);
-        await logUsage(businessId, { geminiTokens: promptTokens + responseTokens });
+        const suggestions = JSON.parse(response.text ?? '[]');
+        return Array.isArray(suggestions) ? suggestions.slice(0, 3) : [];
 
-        const parsed = JSON.parse(jsonStr);
-        return parsed.suggestions || [];
-    } catch (e) {
-        console.error("Error getting agent suggestions:", e);
-        return [];
+    } catch (error) {
+        console.error("Error getting agent suggestions:", error);
+        await logUsage(businessId, { geminiTokens: 150 });
+        return ["How can I help?", "Let me check on that.", "Thanks for waiting."];
     }
 };

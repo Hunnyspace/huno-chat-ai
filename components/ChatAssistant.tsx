@@ -34,6 +34,7 @@ const cleanTextForSpeech = (text: string): string => {
 };
 
 const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
+  const apiKey = import.meta.env.VITE_API_KEY;
   const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,12 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
 
   useEffect(() => {
     const fetchBusinessData = async () => {
+      if (!apiKey) {
+        // This check is now effective because the geminiService doesn't crash on import
+        setError("VITE_API_KEY is not set.");
+        setLoading(false);
+        return;
+      }
       try {
         const data = await getBusinessById(businessId);
         if (data) {
@@ -97,13 +104,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
         }
       } catch (err) {
         console.error("Failed to load business info:", err)
-        setError('Failed to load business information. API keys may be missing.');
+        setError('Failed to load business information. Please ensure all Firebase environment variables are correctly set.');
       } finally {
         setLoading(false);
       }
     };
     fetchBusinessData();
-  }, [businessId]);
+  }, [businessId, apiKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -279,6 +286,18 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
   
   if (loading) {
     return <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading Business...</div>;
+  }
+
+  if (error === "VITE_API_KEY is not set.") {
+    return (
+      <div className="flex items-center justify-center h-screen bg-red-900 text-white p-4 text-center">
+        <div className="max-w-md">
+          <h1 className="text-2xl font-bold mb-4">Configuration Error</h1>
+          <p>The VITE_API_KEY for the AI service is missing. The application cannot start.</p>
+          <p className="mt-2 text-sm text-red-200">Please ensure the key is correctly set in your deployment environment variables and redeploy the application.</p>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
