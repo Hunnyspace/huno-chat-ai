@@ -8,7 +8,8 @@ import { Business, ChatSession } from './types';
 import LiveChatModal from './components/LiveChatModal';
 import AgencyLogin from './components/AgencyLogin';
 import { onAgencyAuthChanged, signOutAgency } from './services/authService';
-import type { User } from 'firebase/auth';
+// Fix: The User type should be imported from 'firebase/compat/app' via the firebase namespace.
+import firebase from 'firebase/compat/app';
 import { listenToBusinessById } from './services/firebaseService';
 
 
@@ -17,7 +18,8 @@ const App: React.FC = () => {
   const businessId = params.get('businessId');
   const path = window.location.pathname;
 
-  const [agencyUser, setAgencyUser] = useState<User | null>(null);
+  // Fix: The User type is available on the firebase namespace.
+  const [agencyUser, setAgencyUser] = useState<firebase.User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   
   const [clientBusiness, setClientBusiness] = useState<Business | null>(() => {
