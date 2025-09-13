@@ -1,0 +1,7 @@
+{
+  "name": "Huno Chat AI",
+  "description": "A premium chat AI platform for businesses, featuring an agency dashboard to manage clients and a client-facing chat assistant powered by Gemini for lead generation and customer support.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
