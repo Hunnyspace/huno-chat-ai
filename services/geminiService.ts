@@ -3,12 +3,9 @@ import { GoogleGenAI, Chat, GenerateContentResponse, Part, Type } from "@google/
 import { Business, ChatMessage, ChatSession } from '../types';
 import { logUsage } from "./firebaseService";
 
-const apiKey = import.meta.env.VITE_API_KEY;
-if (!apiKey) {
-  throw new Error("API_KEY is not set in the environment variables. Please check your .env file.");
-}
-
-const ai = new GoogleGenAI({ apiKey });
+// Fix: Initialize GoogleGenAI with process.env.API_KEY as per the coding guidelines.
+// The API key's availability is assumed to be handled by the execution environment.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to estimate token count
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
@@ -66,7 +63,7 @@ export const getChatResponse = async (chat: Chat, parts: Part[], businessId: str
 
     // Fix: The `sendMessage` method expects a `SendMessageParameters` object, which has a `message` property.
     const result: GenerateContentResponse = await chat.sendMessage({ message: parts });
-    const responseText = result.text;
+    const responseText = result.text ?? '';
     
     const responseTokens = estimateTokens(responseText);
     await logUsage(businessId, { geminiTokens: promptTokens + responseTokens });
@@ -110,7 +107,7 @@ export const generateChatSummary = async (sessions: ChatSession[], businessId: s
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
-      const responseText = response.text;
+      const responseText = response.text ?? '';
       const responseTokens = estimateTokens(responseText);
       await logUsage(businessId, { geminiTokens: promptTokens + responseTokens });
       return responseText;
@@ -162,7 +159,7 @@ export const getAgentSuggestions = async (messages: ChatMessage[], businessId: s
             },
         });
         
-        const jsonStr = response.text.trim();
+        const jsonStr = (response.text ?? '').trim();
         const responseTokens = estimateTokens(jsonStr);
         await logUsage(businessId, { geminiTokens: promptTokens + responseTokens });
 
