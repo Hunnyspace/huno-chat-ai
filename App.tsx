@@ -113,7 +113,7 @@ const App: React.FC = () => {
       {renderContent()}
       {clientBusiness && liveChatSession && (
         <LiveChatModal
-          businessId={clientBusiness.businessId}
+          business={clientBusiness}
           session={liveChatSession}
           onClose={handleCloseLiveChat}
         />

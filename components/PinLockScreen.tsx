@@ -1,3 +1,6 @@
+// Fix: Add reference to vite client types to resolve import.meta.env error
+/// <reference types="vite/client" />
+
 import React, { useState } from 'react';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 

@@ -1,3 +1,6 @@
+// Fix: Add reference to vite client types to resolve import.meta.env errors
+/// <reference types="vite/client" />
+
 // Fix: Changed to Firebase v9+ compat imports to support the v8 namespaced API
 // with the newer Firebase version installed in the project.
 import firebase from "firebase/compat/app";

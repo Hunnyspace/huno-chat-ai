@@ -100,7 +100,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ business, onLogout, o
         const allSessions = await getChatSessionsForBusiness(business.businessId, true);
         setSessions(allSessions);
         setTotalSessions(allSessions.length);
-        const result = await generateChatSummary(allSessions, business.businessId);
+        const result = await generateChatSummary(allSessions, business);
         setSummary(result);
         setGeneratingSummary(false);
     };
@@ -131,12 +131,12 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ business, onLogout, o
         <>
         <div className="min-h-screen p-4 sm:p-8" style={{ backgroundColor: 'var(--bg-primary)' }}>
             <div className="max-w-7xl mx-auto">
-                <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+                <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl sm:text-4xl font-bold" style={{color: 'var(--accent-secondary)'}}>{business.businessName}</h1>
                         <p className="text-[var(--text-secondary)]">Client Dashboard</p>
                     </div>
-                     <div className="flex items-center space-x-3 mt-4 sm:mt-0">
+                     <div className="flex items-center space-x-3">
                         <button onClick={() => setIsSupportModalOpen(true)} className="flex items-center font-semibold py-2 px-4 rounded-lg btn-secondary">
                             <LifebuoyIcon className="w-5 h-5 mr-2" /> Request Support
                         </button>

@@ -150,10 +150,12 @@ export const logChatMessage = async (businessId: string, sessionId: string, mess
         writes++;
 
         // Atomically increment the total message count on the business document
-        await businessRef.update({
-            totalMessages: firebase.firestore.FieldValue.increment(1)
-        });
-        writes++;
+        if (message.sender === 'user' || message.sender === 'ai') {
+          await businessRef.update({
+              totalMessages: firebase.firestore.FieldValue.increment(1)
+          });
+          writes++;
+        }
 
         await logUsage(businessId, { firestoreReads: 1, firestoreWrites: writes });
     } catch (error) {
@@ -170,11 +172,8 @@ export const listenToLiveChat = (businessId: string, sessionId: string, callback
     let cachedAgentJoined: boolean = false;
 
     const fireCallback = () => {
-      if (typeof structuredClone === 'function') {
-        callback(structuredClone(cachedMessages), cachedAgentJoined);
-      } else {
-        callback(JSON.parse(JSON.stringify(cachedMessages)), cachedAgentJoined);
-      }
+      // Use structuredClone for a deep copy to prevent mutation issues
+      callback(structuredClone(cachedMessages), cachedAgentJoined);
     };
 
     const unsubscribeMessages = messagesRef.onSnapshot(snapshot => {
@@ -183,8 +182,11 @@ export const listenToLiveChat = (businessId: string, sessionId: string, callback
     });
 
     const unsubscribeSession = sessionRef.onSnapshot(snapshot => {
-        cachedAgentJoined = snapshot.data()?.agentJoined || false;
-        fireCallback();
+        const agentJoined = snapshot.data()?.agentJoined || false;
+        if (agentJoined !== cachedAgentJoined) {
+            cachedAgentJoined = agentJoined;
+            fireCallback();
+        }
     });
 
     return () => {
@@ -299,17 +301,23 @@ export const updateTicketStatus = async (ticketId: string, status: 'open' | 'clo
     await docRef.update({ status });
 };
 
-export const getDashboardMetrics = async (): Promise<{ totalBusinesses: number; totalMessages: number; activeSubscriptions: number; }> => {
-    const businesses = await getBusinesses(); // 1 read per business (in a batch)
+export const getDashboardMetrics = async (): Promise<{ totalBusinesses: number; totalMessages: number; activeSubscriptions: number; openTickets: number; }> => {
+    const businessesPromise = getBusinesses();
+    const ticketsPromise = getSupportTickets(); // This will fetch all tickets
+    
+    const [businesses, tickets] = await Promise.all([businessesPromise, ticketsPromise]);
     
     const totalMessages = businesses.reduce((sum, business) => sum + (business.totalMessages || 0), 0);
     
     const today = new Date();
     const activeSubscriptions = businesses.filter(b => new Date(b.subscriptionExpiry) > today).length;
+    
+    const openTickets = tickets.filter(t => t.status === 'open').length;
 
     return {
         totalBusinesses: businesses.length,
         totalMessages,
-        activeSubscriptions
+        activeSubscriptions,
+        openTickets,
     };
 };

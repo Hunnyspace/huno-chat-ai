@@ -4,7 +4,11 @@ import { getSupportTickets, updateTicketStatus } from '../services/firebaseServi
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { ArchiveBoxIcon } from './icons/ArchiveBoxIcon';
 
-const SupportTicketsView: React.FC = () => {
+interface SupportTicketsViewProps {
+    onTicketUpdate: () => void;
+}
+
+const SupportTicketsView: React.FC<SupportTicketsViewProps> = ({ onTicketUpdate }) => {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -28,7 +32,8 @@ const SupportTicketsView: React.FC = () => {
     const handleStatusChange = async (ticketId: string, status: 'open' | 'closed') => {
         try {
             await updateTicketStatus(ticketId, status);
-            fetchTickets(); // Refresh the list
+            await fetchTickets(); // Refresh the list
+            onTicketUpdate(); // Notify parent to refresh metrics
         } catch (error) {
             console.error("Failed to update ticket status:", error);
             alert("Could not update ticket status.");
@@ -40,13 +45,13 @@ const SupportTicketsView: React.FC = () => {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-1 glass-card p-4 rounded-2xl">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 glass-card p-4 rounded-2xl">
                 <h2 className="text-xl font-bold mb-4" style={{color: 'var(--accent-secondary)'}}>Ticket Queue</h2>
                 {tickets.length === 0 ? (
                     <p className="text-sm text-[var(--text-secondary)]">No support tickets found.</p>
                 ) : (
-                    <ul className="space-y-2">
+                    <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
                         {tickets.map(ticket => (
                             <li key={ticket.id}>
                                 <button 
@@ -66,7 +71,7 @@ const SupportTicketsView: React.FC = () => {
                     </ul>
                 )}
             </div>
-            <div className="md:col-span-2 glass-card p-6 rounded-2xl">
+            <div className="lg:col-span-2 glass-card p-6 rounded-2xl">
                 {selectedTicket ? (
                     <div>
                         <div className="pb-4 border-b border-[var(--border-color)] mb-4">

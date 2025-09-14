@@ -1,3 +1,6 @@
+// Fix: Add reference to vite client types to resolve import.meta.env error
+/// <reference types="vite/client" />
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Chat, Part } from '@google/genai';
 import { Business, ChatMessage, Product } from '../types';

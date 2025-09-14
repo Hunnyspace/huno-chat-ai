@@ -25,6 +25,7 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({ business, onClose
         products: [],
         dashboardPin: '',
         announcementText: '',
+        geminiApiKey: '',
     };
     setFormData({ ...defaults, ...business });
   }, [business]);
@@ -106,7 +107,7 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({ business, onClose
                  <input type="text" name="catalogueSubtitle" value={formData.catalogueSubtitle} onChange={handleInputChange} placeholder="Custom Catalogue Subtitle" className="w-full input-field rounded-lg px-4 py-2" />
                  <textarea name="announcementText" value={formData.announcementText || ''} onChange={handleInputChange} placeholder="Scrolling Announcement Text (Optional)" rows={2} className="md:col-span-2 w-full input-field rounded-lg px-4 py-2" />
              </div>
-             <h3 className="text-xl font-bold border-b pb-2 pt-4" style={{color: 'var(--accent-secondary)', borderColor: 'var(--border-color)'}}>Subscription & Currency</h3>
+             <h3 className="text-xl font-bold border-b pb-2 pt-4" style={{color: 'var(--accent-secondary)', borderColor: 'var(--border-color)'}}>Subscription & Advanced</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <input type="date" name="subscriptionExpiry" value={formData.subscriptionExpiry} onChange={handleInputChange} placeholder="Subscription Expiry" className="w-full input-field rounded-lg px-4 py-2" />
                  <select name="currency" value={formData.currency} onChange={handleInputChange} className="w-full input-field rounded-lg px-4 py-2">
@@ -115,6 +116,17 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({ business, onClose
                      <option value="EUR">EUR (€)</option>
                      <option value="GBP">GBP (£)</option>
                  </select>
+                  <div className="md:col-span-2">
+                    <input 
+                        type="password" 
+                        name="geminiApiKey" 
+                        value={formData.geminiApiKey || ''} 
+                        onChange={handleInputChange} 
+                        placeholder="Client's Gemini API Key (Optional)" 
+                        className="w-full input-field rounded-lg px-4 py-2" 
+                    />
+                    <p className="text-xs text-gray-400 mt-1 pl-1">If provided, this key will be used for this business instead of the agency's default key.</p>
+                  </div>
               </div>
           </section>
 

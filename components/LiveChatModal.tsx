@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatSession, ChatMessage } from '../types';
+import { ChatSession, ChatMessage, Business } from '../types';
 import { sendAgentMessage } from '../services/firebaseService';
 import { db } from '../services/firebaseConfig';
 import { getAgentSuggestions } from '../services/geminiService';
@@ -8,17 +8,19 @@ import { SendIcon } from './icons/SendIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 
 interface LiveChatModalProps {
-  businessId: string;
+  business: Business;
   session: ChatSession;
   onClose: () => void;
 }
 
-const LiveChatModal: React.FC<LiveChatModalProps> = ({ businessId, session, onClose }) => {
+const LiveChatModal: React.FC<LiveChatModalProps> = ({ business, session, onClose }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(session.messages);
   const [agentInput, setAgentInput] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  const businessId = business.businessId;
 
   useEffect(() => {
     const messagesRef = db.collection('businesses').doc(businessId)
@@ -29,9 +31,12 @@ const LiveChatModal: React.FC<LiveChatModalProps> = ({ businessId, session, onCl
       const liveMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
       
       const lastMessage = liveMessages[liveMessages.length - 1];
-      if (messages.length > 0 && liveMessages.length > messages.length && lastMessage.sender === 'user') {
+      const previousLastMessage = messages[messages.length - 1];
+
+      // Check if the new message is from the user and is genuinely new
+      if (liveMessages.length > messages.length && lastMessage.sender === 'user' && lastMessage.id !== previousLastMessage?.id) {
           setLoadingSuggestions(true);
-          const newSuggestions = await getAgentSuggestions(liveMessages, businessId);
+          const newSuggestions = await getAgentSuggestions(liveMessages, business);
           setSuggestions(newSuggestions);
           setLoadingSuggestions(false);
       }
@@ -39,10 +44,15 @@ const LiveChatModal: React.FC<LiveChatModalProps> = ({ businessId, session, onCl
     });
 
     return () => unsubscribe();
-  }, [businessId, session.id, messages]);
+  }, [businessId, session.id, business, messages]); // `messages` is needed to compare old vs new for suggestion generation
 
   useEffect(() => {
-    chatContainerRef.current?.scrollTo(0, chatContainerRef.current.scrollHeight);
+    if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({
+            top: chatContainerRef.current.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
   }, [messages, suggestions]);
 
   const handleSend = async (messageText?: string) => {
@@ -61,7 +71,7 @@ const LiveChatModal: React.FC<LiveChatModalProps> = ({ businessId, session, onCl
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="glass-pane rounded-2xl w-full max-w-lg max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="glass-pane rounded-2xl w-full max-w-lg max-h-[80vh] sm:max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <header className="p-4 flex justify-between items-center" style={{borderBottom: '1px solid var(--border-color)'}}>
           <h2 className="text-lg font-bold" style={{color: 'var(--accent-secondary)'}}>Live Chat with User</h2>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-[var(--bg-secondary)] transition-colors" aria-label="Close modal">
@@ -71,11 +81,19 @@ const LiveChatModal: React.FC<LiveChatModalProps> = ({ businessId, session, onCl
 
         <main ref={chatContainerRef} className="p-4 flex-1 overflow-y-auto space-y-3">
             {messages.map(msg => (
-                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-3 rounded-lg max-w-sm ${msg.sender === 'user' ? 'bg-indigo-600' : msg.sender === 'agent' ? 'bg-green-600' : 'bg-[var(--bg-secondary)]'}`}>
-                        <p className="text-xs text-[var(--text-secondary)] mb-1 capitalize">{msg.sender === 'agent' ? 'You (Agent)' : msg.sender}</p>
-                        <p className="text-sm whitespace-pre-wrap text-white">{msg.text}</p>
-                    </div>
+                <div key={msg.id} className={`flex ${msg.sender === 'user' || msg.sender === 'agent' ? 'items-end' : 'justify-center'} ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.sender === 'system' ? (
+                         <div className="text-center my-1 w-full">
+                            <p className="text-xs text-[var(--text-secondary)] font-semibold inline-block px-3 py-1 bg-[var(--bg-secondary)] rounded-full">
+                            {msg.text}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className={`p-3 rounded-lg max-w-sm ${msg.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-[var(--bg-secondary)] text-white rounded-bl-none'}`}>
+                            <p className="text-xs text-[var(--text-secondary)] mb-1 capitalize">{msg.sender === 'agent' ? 'You (Agent)' : msg.sender}</p>
+                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        </div>
+                    )}
                 </div>
             ))}
         </main>
@@ -106,7 +124,7 @@ const LiveChatModal: React.FC<LiveChatModalProps> = ({ businessId, session, onCl
               placeholder="Type your message as an agent..."
               className="flex-1 input-field rounded-full px-5 py-3"
             />
-            <button type="submit" className="p-3 rounded-full bg-gradient-to-br from-green-600 to-teal-600 text-white transition-all" aria-label="Send message">
+            <button type="submit" className="p-3 rounded-full bg-gradient-to-br from-green-600 to-teal-600 text-white transition-all disabled:opacity-50" aria-label="Send message" disabled={!agentInput.trim()}>
               <SendIcon />
             </button>
           </form>

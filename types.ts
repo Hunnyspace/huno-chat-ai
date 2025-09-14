@@ -31,6 +31,7 @@ export interface Business {
   subscriptionExpiry: string;
   dashboardPin: string;
   announcementText?: string;
+  geminiApiKey?: string; // Client-specific Gemini API key
   totalMessages: number; // For efficient metric calculation
 }
 

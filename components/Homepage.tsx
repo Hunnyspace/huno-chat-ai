@@ -55,15 +55,17 @@ const Homepage: React.FC = () => {
                 <p className="max-w-2xl mx-auto mt-4 text-lg text-[var(--text-secondary)]">
                     Hunnyspace provides intelligent AI Chat Assistants that automate support, generate leads, and create premium customer experiences, 24/7.
                 </p>
-                <a 
-                    href={agencyWaLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="mt-8 inline-flex items-center justify-center text-lg font-bold py-4 px-10 rounded-full btn-premium-cta"
+                <div 
+                    className="mt-8 inline-block"
                 >
-                    <ArrowRightIcon className="w-5 h-5 mr-3" />
-                    <span>Let's Get Started</span>
-                </a>
+                    <a href={agencyWaLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center text-lg font-bold py-4 px-10 rounded-full btn-premium-cta">
+                        <ArrowRightIcon className="w-5 h-5 mr-3" />
+                        <span>Get Your AI Assistant</span>
+                    </a>
+                    <p className="text-xs text-center text-[var(--text-secondary)] mt-2">
+                        For Commercial Enquiries
+                    </p>
+                </div>
             </section>
 
             {/* Features Section */}
