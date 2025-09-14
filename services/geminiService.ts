@@ -1,4 +1,5 @@
-// Fix: Removed 'vite/client' import as import.meta.env is no longer used.
+// Fix: Import 'vite/client' to include type definitions for `import.meta.env` and resolve TS errors.
+import 'vite/client';
 
 import { GoogleGenAI, Chat, GenerateContentResponse, Part, Type } from "@google/genai";
 import { Business, ChatMessage, ChatSession } from '../types';
@@ -12,11 +13,9 @@ import { logUsage } from "./firebaseService";
  * @returns A GoogleGenAI instance.
  */
 const createAiClient = (apiKey?: string): GoogleGenAI => {
-    // Fix: Per coding guidelines, the API key must be obtained from process.env.API_KEY.
-    const keyToUse = apiKey || process.env.API_KEY;
+    const keyToUse = apiKey || import.meta.env.VITE_API_KEY;
     if (!keyToUse) {
-        // Fix: Updated error message to reflect the use of process.env.API_KEY.
-        throw new Error("Gemini API key is not configured. Provide it for the business or set API_KEY in your environment variables.");
+        throw new Error("Gemini API key is not configured. Provide it for the business or set VITE_API_KEY in your environment variables.");
     }
     return new GoogleGenAI({ apiKey: keyToUse });
 };
