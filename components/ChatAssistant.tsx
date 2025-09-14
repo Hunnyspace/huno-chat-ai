@@ -1,6 +1,3 @@
-// Fix: Import 'vite/client' to include type definitions for `import.meta.env` and resolve TS errors.
-import 'vite/client';
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Chat, Part } from '@google/genai';
 import { Business, ChatMessage, Product } from '../types';
@@ -37,6 +34,7 @@ const cleanTextForSpeech = (text: string): string => {
 };
 
 const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
+  // Fix: Reverted to import.meta.env for client-side Vite environment variables.
   const apiKey = import.meta.env.VITE_API_KEY;
   const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -76,6 +74,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
   useEffect(() => {
     const fetchBusinessData = async () => {
       if (!apiKey) {
+        // Fix: Updated error message to reflect the use of Vite environment variables.
         setError("VITE_API_KEY is not set in your environment variables.");
         setLoading(false);
         return;
@@ -295,6 +294,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
       <div className="flex items-center justify-center h-screen bg-red-900 text-white p-4 text-center">
         <div className="max-w-md">
           <h1 className="text-2xl font-bold mb-4">Configuration Error</h1>
+          {/* Fix: Updated error message to reflect the use of Vite environment variables. */}
           <p>The VITE_API_KEY for the AI service is missing. The application cannot start.</p>
           <p className="mt-2 text-sm text-red-200">Please ensure the key is correctly set in your deployment environment variables and redeploy the application.</p>
         </div>

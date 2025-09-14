@@ -1,6 +1,3 @@
-// Fix: Import 'vite/client' to include type definitions for `import.meta.env` and resolve TS errors.
-import 'vite/client';
-
 import React, { useState } from 'react';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 
