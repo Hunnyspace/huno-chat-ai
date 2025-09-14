@@ -15,6 +15,7 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({ business, onClose
 
   useEffect(() => {
     const defaults = {
+        businessEmail: '',
         catalogueTitle: 'Our Catalogue',
         catalogueSubtitle: 'Browse our selection of products and services.',
         currency: 'INR',
@@ -91,6 +92,7 @@ const EditBusinessModal: React.FC<EditBusinessModalProps> = ({ business, onClose
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input type="text" name="businessName" value={formData.businessName} onChange={handleInputChange} placeholder="Business Name" className="w-full input-field rounded-lg px-4 py-2" />
               <input type="text" name="city" value={formData.city} onChange={handleInputChange} placeholder="City" className="w-full input-field rounded-lg px-4 py-2" />
+               <input type="email" name="businessEmail" value={formData.businessEmail} onChange={handleInputChange} placeholder="Business Email (for login)" className="w-full input-field rounded-lg px-4 py-2" required/>
               <input type="text" name="businessCategory" value={formData.businessCategory} onChange={handleInputChange} placeholder="e.g., Homoeopathy Clinic" className="w-full input-field rounded-lg px-4 py-2" />
               <input type="text" name="characterName" value={formData.characterName} onChange={handleInputChange} placeholder="AI Character Name" className="w-full input-field rounded-lg px-4 py-2" />
               <input type="text" name="businessWaNumber" value={formData.businessWaNumber} onChange={handleInputChange} placeholder="WhatsApp Number (+91...)" className="w-full input-field rounded-lg px-4 py-2" />

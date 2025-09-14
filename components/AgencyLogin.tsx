@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { signInAgency } from '../services/authService';
+import { signInAgency, sendSignInLink } from '../services/authService';
 import { LockClosedIcon } from './icons/LockClosedIcon';
+import EmailVerificationSent from './EmailVerificationSent';
 
 const AgencyLogin: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waitingForEmailLink, setWaitingForEmailLink] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -14,13 +16,19 @@ const AgencyLogin: React.FC = () => {
     setLoading(true);
     try {
       await signInAgency(email, password);
-      // On successful login, the onAuthStateChanged listener in App.tsx will handle the redirect.
+      // After successful password auth, send the 2FA email link.
+      await sendSignInLink(email, `${window.location.origin}/finishLogin`);
+      setWaitingForEmailLink(true);
     } catch (err: any) {
       setError(err.message || 'Failed to login. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
+  
+  if (waitingForEmailLink) {
+    return <EmailVerificationSent email={email} />;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -55,7 +63,7 @@ const AgencyLogin: React.FC = () => {
             disabled={loading}
             className="w-full btn-primary py-3 px-4 rounded-lg disabled:opacity-50"
           >
-            {loading ? 'Logging In...' : 'Login'}
+            {loading ? 'Verifying...' : 'Continue'}
           </button>
         </form>
       </div>

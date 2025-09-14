@@ -7,6 +7,7 @@ import ClientDashboard from './components/ClientDashboard';
 import { Business, ChatSession } from './types';
 import LiveChatModal from './components/LiveChatModal';
 import AgencyLogin from './components/AgencyLogin';
+import FinishLogin from './components/FinishLogin';
 import { onAgencyAuthChanged, signOutAgency } from './services/authService';
 // Fix: The User type should be imported from 'firebase/compat/app' via the firebase namespace.
 import firebase from 'firebase/compat/app';
@@ -91,6 +92,10 @@ const App: React.FC = () => {
 
     if (businessId) {
       return <ChatAssistant businessId={businessId} />;
+    }
+    
+    if (path.startsWith('/finishLogin')) {
+        return <FinishLogin onClientLoginSuccess={handleLoginSuccess} />;
     }
 
     if (path.startsWith('/dashboard')) {

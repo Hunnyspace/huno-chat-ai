@@ -15,6 +15,7 @@ export interface Product {
 export interface Business {
   businessId: string;
   businessName: string;
+  businessEmail: string; // The official email for sending login links and notifications.
   city: string;
   businessCategory: string;
   businessInfo: string;

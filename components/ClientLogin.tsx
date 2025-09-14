@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Business } from '../types';
 import { verifyClientLogin } from '../services/firebaseService';
+import { sendSignInLink } from '../services/authService';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 import Navbar from './Navbar';
+import EmailVerificationSent from './EmailVerificationSent';
 
 interface ClientLoginProps {
   onLoginSuccess: (business: Business) => void;
@@ -13,6 +15,8 @@ const ClientLogin: React.FC<ClientLoginProps> = ({ onLoginSuccess }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waitingForEmailLink, setWaitingForEmailLink] = useState(false);
+  const [businessEmail, setBusinessEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,17 +25,36 @@ const ClientLogin: React.FC<ClientLoginProps> = ({ onLoginSuccess }) => {
     try {
       const business = await verifyClientLogin(businessId.trim(), pin.trim());
       if (business) {
-        onLoginSuccess(business);
+        if (!business.businessEmail) {
+            setError("This business does not have an email configured for secure login. Please contact support.");
+            setLoading(false);
+            return;
+        }
+        // Store business temporarily to retrieve after email link confirmation
+        sessionStorage.setItem('pendingClientLogin', JSON.stringify(business));
+        await sendSignInLink(business.businessEmail, `${window.location.origin}/finishLogin`);
+        setBusinessEmail(business.businessEmail);
+        setWaitingForEmailLink(true);
+
       } else {
         setError('Invalid Business ID or PIN. Please try again.');
       }
     } catch (err) {
       console.error("Login error:", err);
-      setError('An error occurred during login. Please try again later.');
+      setError('An error occurred during login. Please ensure a Firebase user exists for the business email.');
     } finally {
       setLoading(false);
     }
   };
+  
+  if (waitingForEmailLink) {
+    return (
+        <div style={{ backgroundColor: 'var(--bg-primary)' }}>
+            <Navbar />
+            <EmailVerificationSent email={businessEmail} />
+        </div>
+    );
+  }
 
   return (
     <div style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -69,7 +92,7 @@ const ClientLogin: React.FC<ClientLoginProps> = ({ onLoginSuccess }) => {
               disabled={loading}
               className="w-full btn-primary py-3 px-4 rounded-lg disabled:opacity-50"
             >
-              {loading ? 'Logging In...' : 'Login'}
+              {loading ? 'Verifying...' : 'Continue'}
             </button>
           </form>
         </div>

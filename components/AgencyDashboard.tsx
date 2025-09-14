@@ -23,6 +23,7 @@ const AgencyDashboard: React.FC<AgencyDashboardProps> = ({ onLogout }) => {
   const [newBusiness, setNewBusiness] = useState<Omit<Business, 'businessId' | 'products' | 'totalMessages'>>({
     businessName: '',
     city: '',
+    businessEmail: '',
     businessCategory: '',
     businessInfo: '',
     characterName: '',
@@ -75,15 +76,15 @@ const AgencyDashboard: React.FC<AgencyDashboardProps> = ({ onLogout }) => {
 
   const handleAddBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBusiness.businessName || !newBusiness.city || !newBusiness.dashboardPin || !newBusiness.subscriptionExpiry) {
-        alert("Please fill in all required fields: Business Name, City, PIN, and Subscription Expiry.");
+    if (!newBusiness.businessName || !newBusiness.city || !newBusiness.dashboardPin || !newBusiness.subscriptionExpiry || !newBusiness.businessEmail) {
+        alert("Please fill in all required fields: Business Name, City, Email, PIN, and Subscription Expiry.");
         return;
     }
     setSubmitting(true);
     try {
       await addBusiness(newBusiness);
       setNewBusiness({
-        businessName: '', city: '', businessCategory: '', businessInfo: '', characterName: '',
+        businessName: '', city: '', businessEmail: '', businessCategory: '', businessInfo: '', characterName: '',
         businessWaNumber: '', shareImageUrl: '', profileImageUrl: '', websiteUrl: '', googleBusinessUrl: '',
         catalogueTitle: 'Our Catalogue', catalogueSubtitle: 'Browse our selection of products and services.',
         currency: 'INR', subscriptionExpiry: '', dashboardPin: '', announcementText: '',
@@ -165,9 +166,10 @@ const AgencyDashboard: React.FC<AgencyDashboardProps> = ({ onLogout }) => {
               <form onSubmit={handleAddBusiness} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <input type="text" name="businessName" value={newBusiness.businessName} onChange={handleInputChange} placeholder="Business Name*" className="input-field rounded-lg p-2" required/>
                 <input type="text" name="city" value={newBusiness.city} onChange={handleInputChange} placeholder="City*" className="input-field rounded-lg p-2" required/>
+                <input type="email" name="businessEmail" value={newBusiness.businessEmail} onChange={handleInputChange} placeholder="Business Email*" className="input-field rounded-lg p-2" required/>
                 <input type="text" name="dashboardPin" value={newBusiness.dashboardPin} onChange={handleInputChange} placeholder="Dashboard PIN*" className="input-field rounded-lg p-2" required/>
                 <input type="date" name="subscriptionExpiry" value={newBusiness.subscriptionExpiry} onChange={handleInputChange} placeholder="Subscription Expiry*" className="input-field rounded-lg p-2" required/>
-                <textarea name="businessInfo" value={newBusiness.businessInfo} onChange={handleInputChange} placeholder="Business Info for AI" rows={1} className="input-field rounded-lg p-2 lg:col-span-2" />
+                <textarea name="businessInfo" value={newBusiness.businessInfo} onChange={handleInputChange} placeholder="Business Info for AI" rows={1} className="input-field rounded-lg p-2" />
                 <button type="submit" disabled={submitting} className="btn-primary rounded-lg p-2 w-full lg:col-span-3">
                   {submitting ? 'Adding...' : 'Add Business'}
                 </button>
