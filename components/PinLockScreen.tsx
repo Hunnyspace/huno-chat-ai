@@ -1,5 +1,3 @@
-// Fix: Add reference to vite client types to resolve import.meta.env error
-/// <reference types="vite/client" />
 
 import React, { useState } from 'react';
 import { LockClosedIcon } from './icons/LockClosedIcon';
@@ -12,7 +10,8 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
-  const correctPin = import.meta.env.VITE_DASHBOARD_PIN;
+  // Fix: Replaced import.meta.env with process.env to resolve typing errors.
+  const correctPin = process.env.VITE_DASHBOARD_PIN;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
