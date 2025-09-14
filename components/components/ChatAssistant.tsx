@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Chat, Part } from '@google/genai';
 import { Business, ChatMessage, Product } from '../types';
@@ -15,18 +17,27 @@ import { SpeakerWaveIcon } from './icons/SpeakerWaveIcon';
 import { SpeakerXMarkIcon } from './icons/SpeakerXMarkIcon';
 import { XMarkIcon } from './icons/XMarkIcon';
 import { StopCircleIcon } from './icons/StopCircleIcon';
-import { WebsiteIcon } from './icons/WebsiteIcon';
-import { CatalogueIcon } from './icons/CatalogueIcon';
-import { LocationIcon } from './icons/LocationIcon';
 import { WhatsAppIcon } from './icons/WhatsAppIcon';
 import AnnouncementBanner from './AnnouncementBanner';
+import { EllipsisVerticalIcon } from './icons/EllipsisVerticalIcon';
 
 
 interface ChatAssistantProps {
   businessId: string;
 }
 
+const cleanTextForSpeech = (text: string): string => {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Bold
+    .replace(/\*(.*?)\*/g, '$1')   // Italic
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Links
+    .replace(/#{1,6}\s/g, '') // Headers
+    .trim();
+};
+
 const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
+  // Fix: Reverted to import.meta.env for client-side Vite environment variables.
+  const apiKey = import.meta.env.VITE_API_KEY;
   const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,7 +57,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
   const [isCatalogueOpen, setIsCatalogueOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<{ data: string; mimeType: string; name: string } | null>(null);
-  const [isTtsEnabled, setIsTtsEnabled] = useState(true);
+  const [isTtsEnabled, setIsTtsEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
@@ -59,9 +70,17 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
   const [offerProducts, setOfferProducts] = useState<Product[]>([]);
   const [selectedOffer, setSelectedOffer] = useState<Product | null>(null);
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchBusinessData = async () => {
+      if (!apiKey) {
+        // Fix: Updated error message to reflect the use of Vite environment variables.
+        setError("VITE_API_KEY is not set in your environment variables.");
+        setLoading(false);
+        return;
+      }
       try {
         const data = await getBusinessById(businessId);
         if (data) {
@@ -88,13 +107,25 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
         }
       } catch (err) {
         console.error("Failed to load business info:", err)
-        setError('Failed to load business information. API keys may be missing.');
+        setError('Failed to load business information. Please ensure all Firebase environment variables are correctly set.');
       } finally {
         setLoading(false);
       }
     };
     fetchBusinessData();
-  }, [businessId]);
+  }, [businessId, apiKey]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -125,7 +156,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
   const speak = useCallback((text: string) => {
     if (!isTtsEnabled || !text) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    
+    const cleanedText = cleanTextForSpeech(text);
+    const utterance = new SpeechSynthesisUtterance(cleanedText);
+    
     const languageVoices = voices.filter(v => v.lang.startsWith(selectedLanguage.split('-')[0]));
     const genderVoices = languageVoices.filter(v => v.name.toLowerCase().includes(selectedGender));
     const voiceToUse = genderVoices[0] || languageVoices[0] || voices[0];
@@ -257,6 +291,19 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
     return <div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading Business...</div>;
   }
 
+  if (error === "VITE_API_KEY is not set in your environment variables.") {
+    return (
+      <div className="flex items-center justify-center h-screen bg-red-900 text-white p-4 text-center">
+        <div className="max-w-md">
+          <h1 className="text-2xl font-bold mb-4">Configuration Error</h1>
+          {/* Fix: Updated error message to reflect the use of Vite environment variables. */}
+          <p>The VITE_API_KEY for the AI service is missing. The application cannot start.</p>
+          <p className="mt-2 text-sm text-red-200">Please ensure the key is correctly set in your deployment environment variables and redeploy the application.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return <div className="flex items-center justify-center h-screen bg-red-900 text-white p-4 text-center">{error}</div>;
   }
@@ -285,27 +332,60 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
                   </p>
               </div>
           </div>
-          <div className="flex items-center space-x-2">
-              {business.websiteUrl && (
-                  <a href={business.websiteUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full hover:bg-[var(--bg-secondary)] transition-colors" title="Visit Website">
-                      <WebsiteIcon className="w-5 h-5 text-[var(--text-secondary)]" />
-                  </a>
-              )}
-              {business.googleBusinessUrl && (
-                  <a href={business.googleBusinessUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full hover:bg-[var(--bg-secondary)] transition-colors" title="View on Google">
-                      <LocationIcon className="w-5 h-5 text-[var(--text-secondary)]" />
-                  </a>
-              )}
-              <button onClick={() => setIsCatalogueOpen(true)} className="p-2 rounded-full hover:bg-[var(--bg-secondary)] transition-colors" title="View Catalogue">
-                  <CatalogueIcon className="w-5 h-5 text-[var(--text-secondary)]" />
-              </button>
-              <button onClick={() => {
-                  window.speechSynthesis.cancel();
-                  setIsTtsEnabled(!isTtsEnabled)
-              }} className="p-2 rounded-full hover:bg-[var(--bg-secondary)] transition-colors" title={isTtsEnabled ? "Disable Text-to-Speech" : "Enable Text-to-Speech"}>
-                  {isTtsEnabled ? <SpeakerWaveIcon className="w-5 h-5 text-[var(--accent-primary)]" /> : <SpeakerXMarkIcon className="w-5 h-5 text-[var(--text-secondary)]" />}
-              </button>
-          </div>
+          <div className="relative" ref={menuRef}>
+            <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 rounded-full hover:bg-[var(--bg-secondary)] transition-colors"
+                title="More options"
+                aria-haspopup="true"
+                aria-expanded={isMenuOpen}
+            >
+                <EllipsisVerticalIcon className="w-6 h-6 text-[var(--text-secondary)]" />
+            </button>
+            {isMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 w-56 glass-pane rounded-lg shadow-lg z-20 animate-fade-in-fast">
+                <ul className="p-2 space-y-1">
+                    {business.websiteUrl && (
+                    <li>
+                        <a href={business.websiteUrl} target="_blank" rel="noopener noreferrer" className="block w-full p-2 rounded-md hover:bg-[var(--bg-secondary)] transition-colors text-sm">
+                        Visit Website
+                        </a>
+                    </li>
+                    )}
+                    {business.googleBusinessUrl && (
+                    <li>
+                        <a href={business.googleBusinessUrl} target="_blank" rel="noopener noreferrer" className="block w-full p-2 rounded-md hover:bg-[var(--bg-secondary)] transition-colors text-sm">
+                        View on Google
+                        </a>
+                    </li>
+                    )}
+                    <li>
+                    <button
+                        onClick={() => {
+                        setIsCatalogueOpen(true);
+                        setIsMenuOpen(false);
+                        }}
+                        className="w-full text-left p-2 rounded-md hover:bg-[var(--bg-secondary)] transition-colors text-sm"
+                    >
+                        View Catalogue
+                    </button>
+                    </li>
+                    <li>
+                    <button
+                        onClick={() => {
+                        window.speechSynthesis.cancel();
+                        setIsTtsEnabled(!isTtsEnabled);
+                        setIsMenuOpen(false);
+                        }}
+                        className="w-full text-left p-2 rounded-md hover:bg-[var(--bg-secondary)] transition-colors text-sm"
+                    >
+                        {isTtsEnabled ? 'Disable Voice' : 'Enable Voice'}
+                    </button>
+                    </li>
+                </ul>
+                </div>
+            )}
+            </div>
         </header>
 
         {/* Chat Area */}
@@ -331,11 +411,14 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
         
         {/* Offers Carousel */}
         {offerProducts.length > 0 && (
-          <section className="p-4 pt-0">
+          <section className="p-4 pt-0" onClick={() => setSelectedOffer(null)}>
             <h3 className="text-sm font-bold text-[var(--accent-secondary)] mb-2">Special Offers Just For You!</h3>
             <div className="flex space-x-3 overflow-x-auto pb-3">
               {offerProducts.map(product => (
-                <button key={product.id} onClick={() => setSelectedOffer(product)}
+                <button key={product.id} onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedOffer(prev => prev?.id === product.id ? null : product);
+                  }}
                   className={`flex-shrink-0 w-48 text-left rounded-lg overflow-hidden border-2 transition-all duration-200 ${selectedOffer?.id === product.id ? 'border-[var(--accent-primary)] scale-105' : 'border-transparent'}`}
                 >
                   <img src={product.imageUrl} alt={product.name} className="w-full h-20 object-cover" />
@@ -349,7 +432,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
               ))}
             </div>
             {selectedOffer && (
-                 <button onClick={handleOfferWhatsAppClick} className="w-full mt-2 flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-500 transition-all duration-200">
+                 <button onClick={(e) => { e.stopPropagation(); handleOfferWhatsAppClick(); }} className="w-full mt-2 flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-500 transition-all duration-200">
                     <WhatsAppIcon className="w-5 h-5 mr-2" />
                     Get Details for "{selectedOffer.name}"
                 </button>
@@ -403,6 +486,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ businessId }) => {
       {isCatalogueOpen && (
         <ProductCatalogueModal business={business} onClose={() => setIsCatalogueOpen(false)} />
       )}
+      <style>{`
+        @keyframes fade-in-fast {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-fast { animation: fade-in-fast 0.2s ease-out; }
+      `}</style>
     </>
   );
 };

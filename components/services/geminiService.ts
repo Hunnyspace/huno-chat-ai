@@ -1,17 +1,26 @@
-// Fix: Update the import to use the correct '@google/genai' package.
+/// <reference types="vite/client" />
+
 import { GoogleGenAI, Chat, GenerateContentResponse, Part, Type } from "@google/genai";
 import { Business, ChatMessage, ChatSession } from '../types';
 import { logUsage } from "./firebaseService";
 
-const apiKey = import.meta.env.VITE_API_KEY;
 
-if (!apiKey) {
-  // This error will be thrown during development if the .env file is missing the key,
-  // or in production if the environment variable is not set correctly in the deployment settings.
-  throw new Error("VITE_API_KEY is not set. Please add it to your .env file or environment variables.");
-}
+/**
+ * Creates a GoogleGenAI client instance.
+ * It uses a business-specific API key if provided, otherwise falls back to the environment variable.
+ * @param apiKey - An optional, business-specific Gemini API key.
+ * @returns A GoogleGenAI instance.
+ */
+const createAiClient = (apiKey?: string): GoogleGenAI => {
+    // Fix: Reverted to import.meta.env for client-side Vite environment variables.
+    const keyToUse = apiKey || import.meta.env.VITE_API_KEY;
+    if (!keyToUse) {
+        // Fix: Updated error message to reflect the use of Vite environment variables.
+        throw new Error("Gemini API key is not configured. Provide it for the business or set VITE_API_KEY in your environment variables.");
+    }
+    return new GoogleGenAI({ apiKey: keyToUse });
+};
 
-const ai = new GoogleGenAI({ apiKey });
 
 /**
  * Creates a new chat session with a system instruction tailored to the business.
@@ -19,6 +28,7 @@ const ai = new GoogleGenAI({ apiKey });
  * @returns A Chat instance.
  */
 export const createChatSession = (business: Business): Chat => {
+  const aiClient = createAiClient(business.geminiApiKey);
   const systemInstruction = `You are ${business.characterName}, a friendly and professional AI assistant for ${business.businessName}, a ${business.businessCategory} located in ${business.city}. 
   Your goal is to assist customers, answer their questions, and generate leads.
   Business Information: ${business.businessInfo}.
@@ -35,7 +45,7 @@ export const createChatSession = (business: Business): Chat => {
   9.  The currency for all pricing is ${business.currency}.
   10. When asked to perform an action you cannot do (e.g., book an appointment directly, process payments), guide the user to contact the business on WhatsApp to complete the action.`;
 
-  const chat = ai.chats.create({
+  const chat = aiClient.chats.create({
     model: 'gemini-2.5-flash',
     config: {
       systemInstruction: systemInstruction,
@@ -53,7 +63,6 @@ export const createChatSession = (business: Business): Chat => {
  */
 export const getChatResponse = async (chat: Chat, parts: Part[], businessId: string): Promise<string> => {
   try {
-    // Fix: The 'sendMessage' method expects a 'message' property, not 'parts'.
     const response: GenerateContentResponse = await chat.sendMessage({ message: parts });
     // Rough token calculation for internal usage metrics (1 token ~ 4 chars)
     const promptTokens = parts.reduce((acc, part) => acc + (part.text?.length || 0), 0) / 4;
@@ -71,14 +80,13 @@ export const getChatResponse = async (chat: Chat, parts: Part[], businessId: str
 /**
  * Generates an AI-powered summary of recent chat sessions.
  * @param sessions - An array of ChatSession objects.
- * @param businessId - The ID of the business for usage logging.
+ * @param business - The business object for API key and usage logging.
  * @returns A markdown-formatted summary string.
  */
-export const generateChatSummary = async (sessions: ChatSession[], businessId: string): Promise<string> => {
+export const generateChatSummary = async (sessions: ChatSession[], business: Business): Promise<string> => {
     if (sessions.length === 0) {
         return "No chat sessions found to analyze for the summary.";
     }
-
     const chatLogs = sessions.slice(0, 10).map(session => {
         const messages = session.messages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
         return `--- Session Start ---\n${messages}\n--- Session End ---`;
@@ -98,19 +106,20 @@ export const generateChatSummary = async (sessions: ChatSession[], businessId: s
     Provide a professional, data-driven summary.`;
 
     try {
-        const response = await ai.models.generateContent({
+        const aiClient = createAiClient(business.geminiApiKey);
+        const response = await aiClient.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
         });
 
         const promptTokens = prompt.length / 4;
         const responseTokens = (response.text?.length || 0) / 4;
-        await logUsage(businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
+        await logUsage(business.businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
         
         return response.text ?? "Could not generate a summary at this time.";
     } catch (error) {
         console.error("Error generating chat summary:", error);
-        await logUsage(businessId, { geminiTokens: 200 });
+        await logUsage(business.businessId, { geminiTokens: 200 });
         return "An error occurred while generating the summary.";
     }
 };
@@ -118,15 +127,14 @@ export const generateChatSummary = async (sessions: ChatSession[], businessId: s
 /**
  * Generates quick reply suggestions for a human agent.
  * @param messages - The recent messages in the conversation.
- * @param businessId - The ID of the business for usage logging.
+ * @param business - The business object for API key and usage logging.
  * @returns An array of string suggestions.
  */
-export const getAgentSuggestions = async (messages: ChatMessage[], businessId: string): Promise<string[]> => {
+export const getAgentSuggestions = async (messages: ChatMessage[], business: Business): Promise<string[]> => {
     const lastUserMessage = messages.filter(m => m.sender === 'user').pop();
     if (!lastUserMessage) {
         return [];
     }
-
     const conversationHistory = messages.slice(-5).map(m => `${m.sender}: ${m.text}`).join('\n');
 
     const prompt = `You are an assistant for a human customer support agent. Based on the recent conversation history, and specifically the last user message, provide three concise, helpful, and professional quick reply suggestions for the agent.
@@ -138,7 +146,8 @@ export const getAgentSuggestions = async (messages: ChatMessage[], businessId: s
     Return a JSON array of three distinct string suggestions. For example: ["Yes, I can help with that.", "Let me check on that for you.", "Could you provide more details?"]`;
 
     try {
-        const response = await ai.models.generateContent({
+        const aiClient = createAiClient(business.geminiApiKey);
+        const response = await aiClient.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -153,14 +162,14 @@ export const getAgentSuggestions = async (messages: ChatMessage[], businessId: s
         });
         const promptTokens = prompt.length / 4;
         const responseTokens = (response.text?.length || 0) / 4;
-        await logUsage(businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
+        await logUsage(business.businessId, { geminiTokens: Math.round(promptTokens + responseTokens) });
         
         const suggestions = JSON.parse(response.text ?? '[]');
         return Array.isArray(suggestions) ? suggestions.slice(0, 3) : [];
 
     } catch (error) {
         console.error("Error getting agent suggestions:", error);
-        await logUsage(businessId, { geminiTokens: 150 });
+        await logUsage(business.businessId, { geminiTokens: 150 });
         return ["How can I help?", "Let me check on that.", "Thanks for waiting."];
     }
 };

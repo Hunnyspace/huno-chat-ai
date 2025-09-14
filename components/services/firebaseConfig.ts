@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 // Fix: Changed to Firebase v9+ compat imports to support the v8 namespaced API
 // with the newer Firebase version installed in the project.
 import firebase from "firebase/compat/app";
@@ -5,6 +7,7 @@ import "firebase/compat/firestore";
 import "firebase/compat/auth";
 
 const firebaseConfig = {
+  // Fix: Reverted to import.meta.env for client-side Vite environment variables.
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,

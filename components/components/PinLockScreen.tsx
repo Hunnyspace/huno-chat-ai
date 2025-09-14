@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import React, { useState } from 'react';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 
@@ -9,6 +11,7 @@ const PinLockScreen: React.FC<PinLockScreenProps> = ({ onUnlock }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
 
+  // Fix: Reverted to import.meta.env for client-side Vite environment variables.
   const correctPin = import.meta.env.VITE_DASHBOARD_PIN;
 
   const handleSubmit = (e: React.FormEvent) => {
