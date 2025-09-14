@@ -11,19 +11,18 @@ interface ClientLoginProps {
 }
 
 const ClientLogin: React.FC<ClientLoginProps> = ({ onLoginSuccess }) => {
-  const [businessId, setBusinessId] = useState('');
+  const [businessEmail, setBusinessEmail] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [waitingForEmailLink, setWaitingForEmailLink] = useState(false);
-  const [businessEmail, setBusinessEmail] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const business = await verifyClientLogin(businessId.trim(), pin.trim());
+      const business = await verifyClientLogin(businessEmail.trim(), pin.trim());
       if (business) {
         if (!business.businessEmail) {
             setError("This business does not have an email configured for secure login. Please contact support.");
@@ -33,11 +32,10 @@ const ClientLogin: React.FC<ClientLoginProps> = ({ onLoginSuccess }) => {
         // Store business temporarily to retrieve after email link confirmation
         sessionStorage.setItem('pendingClientLogin', JSON.stringify(business));
         await sendSignInLink(business.businessEmail, `${window.location.origin}/finishLogin`);
-        setBusinessEmail(business.businessEmail);
         setWaitingForEmailLink(true);
 
       } else {
-        setError('Invalid Business ID or PIN. Please try again.');
+        setError('Invalid Business Email or PIN. Please try again.');
       }
     } catch (err) {
       console.error("Login error:", err);
@@ -62,20 +60,19 @@ const ClientLogin: React.FC<ClientLoginProps> = ({ onLoginSuccess }) => {
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="w-full max-w-md p-8 space-y-6 glass-pane rounded-2xl">
           <div className="text-center">
-            {/* Fix: Replaced style prop with a Tailwind text color class since the component does not accept a style prop. */}
             <LockClosedIcon className="w-12 h-12 mx-auto text-[var(--accent-primary)]"/>
             <h1 className="text-2xl font-bold text-white mt-4">Client Dashboard Login</h1>
             <p className="text-[var(--text-secondary)]">Access your chat analytics and insights.</p>
           </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
-              type="text"
-              value={businessId}
-              onChange={(e) => setBusinessId(e.target.value)}
-              placeholder="Enter your Business ID"
+              type="email"
+              value={businessEmail}
+              onChange={(e) => setBusinessEmail(e.target.value)}
+              placeholder="Enter your Business Email"
               className="w-full input-field rounded-lg px-4 py-3"
               required
-              aria-label="Business ID input"
+              aria-label="Business Email input"
             />
             <input
               type="password"

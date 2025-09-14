@@ -112,12 +112,26 @@ export const updateBusiness = async (businessId: string, businessData: Business)
   await logUsage(businessId, { firestoreWrites: 1 });
 };
 
-export const verifyClientLogin = async (businessId: string, pin: string): Promise<Business | null> => {
-    const business = await getBusinessById(businessId); // This logs 1 read
-    if (business && business.dashboardPin === pin) {
-        return business;
+export const verifyClientLogin = async (email: string, pin: string): Promise<Business | null> => {
+    const query = businessesCollectionRef
+        .where('businessEmail', '==', email)
+        .where('dashboardPin', '==', pin)
+        .limit(1);
+
+    const snapshot = await query.get();
+    
+    // Log one read for the query attempt.
+    await logUsage('agency-wide-metrics', { firestoreReads: 1 });
+
+    if (snapshot.empty) {
+        return null;
     }
-    return null;
+
+    const business = snapshot.docs[0].data() as Business;
+    // Log an additional read for the successful login to the specific business
+    await logUsage(business.businessId, { firestoreReads: 1 });
+
+    return business;
 };
 
 export const logChatMessage = async (businessId: string, sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
